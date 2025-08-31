@@ -5,8 +5,8 @@ module MCP
     class << self
       NOT_SET = Object.new
 
-      attr_reader :title_value
       attr_reader :description_value
+      attr_reader :input_schema_value
       attr_reader :annotations_value
 
       def call(*args, server_context: nil)
@@ -16,7 +16,6 @@ module MCP
       def to_h
         result = {
           name: name_value,
-          title: title_value,
           description: description_value,
           inputSchema: input_schema_value.to_h,
         }
@@ -27,7 +26,6 @@ module MCP
       def inherited(subclass)
         super
         subclass.instance_variable_set(:@name_value, nil)
-        subclass.instance_variable_set(:@title_value, nil)
         subclass.instance_variable_set(:@description_value, nil)
         subclass.instance_variable_set(:@input_schema_value, nil)
         subclass.instance_variable_set(:@annotations_value, nil)
@@ -43,18 +41,6 @@ module MCP
 
       def name_value
         @name_value || StringUtils.handle_from_class_name(name)
-      end
-
-      def input_schema_value
-        @input_schema_value || InputSchema.new
-      end
-
-      def title(value = NOT_SET)
-        if value == NOT_SET
-          @title_value
-        else
-          @title_value = value
-        end
       end
 
       def description(value = NOT_SET)
@@ -85,10 +71,9 @@ module MCP
         end
       end
 
-      def define(name: nil, title: nil, description: nil, input_schema: nil, annotations: nil, &block)
+      def define(name: nil, description: nil, input_schema: nil, annotations: nil, &block)
         Class.new(self) do
           tool_name name
-          title title
           description description
           input_schema input_schema
           self.annotations(annotations) if annotations

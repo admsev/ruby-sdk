@@ -108,9 +108,9 @@ The server supports sending notifications to clients when lists of tools, prompt
 
 The server provides three notification methods:
 
-- `notify_tools_list_changed` - Send a notification when the tools list changes
-- `notify_prompts_list_changed` - Send a notification when the prompts list changes
-- `notify_resources_list_changed` - Send a notification when the resources list changes
+- `notify_tools_list_changed()` - Send a notification when the tools list changes
+- `notify_prompts_list_changed()` - Send a notification when the prompts list changes
+- `notify_resources_list_changed()` - Send a notification when the resources list changes
 
 #### Notification Format
 
@@ -134,7 +134,7 @@ server.transport = transport
 
 # When tools change, notify clients
 server.define_tool(name: "new_tool") { |**args| { result: "ok" } }
-server.notify_tools_list_changed
+server.notify_tools_list_changed()
 ```
 
 ### Unsupported Features ( to be implemented in future versions )
@@ -148,19 +148,18 @@ server.notify_tools_list_changed
 #### Rails Controller
 
 When added to a Rails controller on a route that handles POST requests, your server will be compliant with non-streaming
-[Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http) transport
+[Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport
 requests.
 
 You can use the `Server#handle_json` method to handle requests.
 
 ```ruby
 class ApplicationController < ActionController::Base
+
   def index
     server = MCP::Server.new(
       name: "my_server",
-      title: "Example Server Display Name", # WARNING: This is a `Draft` and is not supported in the `Version 2025-06-18 (latest)` specification.
       version: "1.0.0",
-      instructions: "Use the tools of this server as a last resort",
       tools: [SomeTool, AnotherTool],
       prompts: [MyPrompt],
       server_context: { user_id: current_user.id },
@@ -215,7 +214,6 @@ You can run this script and then type in requests to the server at the command l
 $ ruby examples/stdio_server.rb
 {"jsonrpc":"2.0","id":"1","method":"ping"}
 {"jsonrpc":"2.0","id":"2","method":"tools/list"}
-{"jsonrpc":"2.0","id":"3","method":"tools/call","params":{"name":"example_tool","arguments":{"message":"Hello"}}}
 ```
 
 ## Configuration
@@ -328,22 +326,19 @@ config.instrumentation_callback = ->(data) {
 
 ### Server Protocol Version
 
-The server's protocol version can be overridden using the `protocol_version` keyword argument:
+The server's protocol version can be overridden using the `protocol_version` class method:
 
 ```ruby
-configuration = MCP::Configuration.new(protocol_version: "2024-11-05")
-MCP::Server.new(name: "test_server", configuration: configuration)
+MCP::Server.protocol_version = "2024-11-05"
 ```
 
 This will make all new server instances use the specified protocol version instead of the default version. The protocol version can be reset to the default by setting it to `nil`:
 
 ```ruby
-MCP::Configuration.new(protocol_version: nil)
+MCP::Server.protocol_version = nil
 ```
 
-If an invalid `protocol_version` value is set, an `ArgumentError` is raised.
-
-Be sure to check the [MCP spec](https://modelcontextprotocol.io/specification/versioning) for the protocol version to understand the supported features for the version being set.
+Be sure to check the [MCP spec](https://modelcontextprotocol.io/specification/2025-03-26) for the protocol version to understand the supported features for the version being set.
 
 ### Exception Reporting
 
@@ -367,7 +362,7 @@ If no exception reporter is configured, a default no-op reporter is used that si
 
 ## Tools
 
-MCP spec includes [Tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools) which provide functionality to LLM apps.
+MCP spec includes [Tools](https://modelcontextprotocol.io/docs/concepts/tools) which provide functionality to LLM apps.
 
 This gem provides a `MCP::Tool` class that can be used to create tools in two ways:
 
@@ -375,7 +370,6 @@ This gem provides a `MCP::Tool` class that can be used to create tools in two wa
 
 ```ruby
 class MyTool < MCP::Tool
-  title "My Tool" # WARNING: This is a `Draft` and is not supported in the `Version 2025-06-18 (latest)` specification.
   description "This tool performs specific functionality..."
   input_schema(
     properties: {
@@ -384,11 +378,11 @@ class MyTool < MCP::Tool
     required: ["message"]
   )
   annotations(
+    title: "My Tool",
     read_only_hint: true,
     destructive_hint: false,
     idempotent_hint: true,
-    open_world_hint: false,
-    title: "My Tool"
+    open_world_hint: false
   )
 
   def self.call(message:, server_context:)
@@ -404,14 +398,13 @@ tool = MyTool
 ```ruby
 tool = MCP::Tool.define(
   name: "my_tool",
-  title: "My Tool", # WARNING: This is a `Draft` and is not supported in the `Version 2025-06-18 (latest)` specification.
   description: "This tool performs specific functionality...",
   annotations: {
-    read_only_hint: true,
-    title: "My Tool"
+    title: "My Tool",
+    read_only_hint: true
   }
 ) do |args, server_context|
-  MCP::Tool::Response.new([{ type: "text", text: "OK" }])
+  Tool::Response.new([{ type: "text", text: "OK" }])
 end
 ```
 
@@ -422,17 +415,17 @@ e.g. around authentication state.
 
 Tools can include annotations that provide additional metadata about their behavior. The following annotations are supported:
 
-- `destructive_hint`: Indicates if the tool performs destructive operations. Defaults to true
-- `idempotent_hint`: Indicates if the tool's operations are idempotent. Defaults to false
-- `open_world_hint`: Indicates if the tool operates in an open world context. Defaults to true
-- `read_only_hint`: Indicates if the tool only reads data (doesn't modify state). Defaults to false
 - `title`: A human-readable title for the tool
+- `read_only_hint`: Indicates if the tool only reads data (doesn't modify state)
+- `destructive_hint`: Indicates if the tool performs destructive operations
+- `idempotent_hint`: Indicates if the tool's operations are idempotent
+- `open_world_hint`: Indicates if the tool operates in an open world context
 
 Annotations can be set either through the class definition using the `annotations` class method or when defining a tool using the `define` method.
 
 ## Prompts
 
-MCP spec includes [Prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts), which enable servers to define reusable prompt templates and workflows that clients can easily surface to users and LLMs.
+MCP spec includes [Prompts](https://modelcontextprotocol.io/docs/concepts/prompts), which enable servers to define reusable prompt templates and workflows that clients can easily surface to users and LLMs.
 
 The `MCP::Prompt` class provides two ways to create prompts:
 
@@ -441,10 +434,9 @@ The `MCP::Prompt` class provides two ways to create prompts:
 ```ruby
 class MyPrompt < MCP::Prompt
   prompt_name "my_prompt"  # Optional - defaults to underscored class name
-  title "My Prompt" # WARNING: This is a `Draft` and is not supported in the `Version 2025-06-18 (latest)` specification.
   description "This prompt performs specific functionality..."
   arguments [
-    MCP::Prompt::Argument.new(
+    Prompt::Argument.new(
       name: "message",
       description: "Input message",
       required: true
@@ -453,16 +445,16 @@ class MyPrompt < MCP::Prompt
 
   class << self
     def template(args, server_context:)
-      MCP::Prompt::Result.new(
+      Prompt::Result.new(
         description: "Response description",
         messages: [
-          MCP::Prompt::Message.new(
+          Prompt::Message.new(
             role: "user",
-            content: MCP::Content::Text.new("User message")
+            content: Content::Text.new("User message")
           ),
-          MCP::Prompt::Message.new(
+          Prompt::Message.new(
             role: "assistant",
-            content: MCP::Content::Text.new(args["message"])
+            content: Content::Text.new(args["message"])
           )
         ]
       )
@@ -478,26 +470,25 @@ prompt = MyPrompt
 ```ruby
 prompt = MCP::Prompt.define(
   name: "my_prompt",
-  title: "My Prompt", # WARNING: This is a `Draft` and is not supported in the `Version 2025-06-18 (latest)` specification.
   description: "This prompt performs specific functionality...",
   arguments: [
-    MCP::Prompt::Argument.new(
+    Prompt::Argument.new(
       name: "message",
       description: "Input message",
       required: true
     )
   ]
 ) do |args, server_context:|
-  MCP::Prompt::Result.new(
+  Prompt::Result.new(
     description: "Response description",
     messages: [
-      MCP::Prompt::Message.new(
+      Prompt::Message.new(
         role: "user",
-        content: MCP::Content::Text.new("User message")
+        content: Content::Text.new("User message")
       ),
-      MCP::Prompt::Message.new(
+      Prompt::Message.new(
         role: "assistant",
-        content: MCP::Content::Text.new(args["message"])
+        content: Content::Text.new(args["message"])
       )
     ]
   )
@@ -509,10 +500,147 @@ e.g. around authentication state or user preferences.
 
 ### Key Components
 
-- `MCP::Prompt::Argument` - Defines input parameters for the prompt template
-- `MCP::Prompt::Message` - Represents a message in the conversation with a role and content
-- `MCP::Prompt::Result` - The output of a prompt template containing description and messages
-- `MCP::Content::Text` - Text content for messages
+- `Prompt::Argument` - Defines input parameters for the prompt template
+- `Prompt::Message` - Represents a message in the conversation with a role and content
+- `Prompt::Result` - The output of a prompt template containing description and messages
+- `Content::Text` - Text content for messages
+
+### Prompt Arguments
+
+The `Prompt::Argument` class supports various argument types including enums, strings, numbers, integers, and booleans. Each argument type includes JSON Schema validation and can be used with the MCP completion API.
+
+#### Basic Arguments
+
+```ruby
+# Simple string argument
+Prompt::Argument.new(
+  name: "message",
+  description: "The message to process",
+  required: true
+)
+```
+
+#### Enum Arguments
+
+```ruby
+# Enum argument with values and display names
+Prompt::Argument.enum(
+  name: "language",
+  enum_values: ["python", "javascript", "ruby", "java"],
+  enum_names: ["Python", "JavaScript", "Ruby", "Java"],
+  description: "The programming language",
+  required: true
+)
+
+# Enum argument with values only
+Prompt::Argument.enum(
+  name: "review_type",
+  enum_values: ["security", "performance", "style", "comprehensive"],
+  description: "Type of review to perform",
+  required: false
+)
+```
+
+#### String Arguments
+
+```ruby
+# String with format validation
+Prompt::Argument.string(
+  name: "email",
+  description: "User email address",
+  required: true,
+  format: "email"
+)
+
+# String with length constraints
+Prompt::Argument.string(
+  name: "code",
+  description: "Code to review",
+  required: true,
+  min_length: 1,
+  max_length: 10000
+)
+```
+
+#### Number Arguments
+
+```ruby
+# Number with range constraints
+Prompt::Argument.number(
+  name: "temperature",
+  description: "Temperature value",
+  required: false,
+  minimum: 0.0,
+  maximum: 1.0
+)
+
+# Integer with range constraints
+Prompt::Argument.integer(
+  name: "max_tokens",
+  description: "Maximum number of tokens",
+  required: false,
+  minimum: 1,
+  maximum: 4000
+)
+```
+
+#### Boolean Arguments
+
+```ruby
+Prompt::Argument.boolean(
+  name: "include_suggestions",
+  description: "Whether to include code suggestions",
+  required: false
+)
+```
+
+#### Complete Example
+
+```ruby
+class CodeReviewPrompt < MCP::Prompt
+  description "A prompt for code review with language selection"
+  arguments [
+    MCP::Prompt::Argument.enum(
+      name: "language",
+      enum_values: ["python", "javascript", "ruby", "java"],
+      enum_names: ["Python", "JavaScript", "Ruby", "Java"],
+      description: "The programming language of the code to review",
+      required: true
+    ),
+    MCP::Prompt::Argument.string(
+      name: "code",
+      description: "The code to review",
+      required: true,
+      max_length: 5000
+    ),
+    MCP::Prompt::Argument.enum(
+      name: "review_type",
+      enum_values: ["security", "performance", "style", "comprehensive"],
+      description: "Type of review to perform",
+      required: false
+    )
+  ]
+
+  class << self
+    def template(args, server_context:)
+      language = args[:language]
+      code = args[:code]
+      review_type = args[:review_type] || "comprehensive"
+
+      prompt_text = "Please review this #{language} code with a focus on #{review_type} aspects.\n\nCode to review:\n#{code}"
+
+      MCP::Prompt::Result.new(
+        messages: [
+          MCP::Prompt::Message.new(
+            role: "user",
+            content: MCP::Content::Text.new(prompt_text),
+          ),
+        ],
+      )
+    end
+  end
+end
+```
 
 ### Usage
 
@@ -545,30 +673,26 @@ end
 ```
 
 The data contains the following keys:
-
-- `method`: the method called, e.g. `ping`, `tools/list`, `tools/call` etc
-- `tool_name`: the name of the tool called
-- `prompt_name`: the name of the prompt called
-- `resource_uri`: the uri of the resource called
-- `error`: if looking up tools/prompts etc failed, e.g. `tool_not_found`
-- `duration`: the duration of the call in seconds
+`method`: the metod called, e.g. `ping`, `tools/list`, `tools/call` etc
+`tool_name`: the name of the tool called
+`prompt_name`: the name of the prompt called
+`resource_uri`: the uri of the resource called
+`error`: if looking up tools/prompts etc failed, e.g. `tool_not_found`
+`duration`: the duration of the call in seconds
 
 `tool_name`, `prompt_name` and `resource_uri` are only populated if a matching handler is registered.
 This is to avoid potential issues with metric cardinality
 
 ## Resources
 
-MCP spec includes [Resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources).
-
-### Reading Resources
+MCP spec includes [Resources](https://modelcontextprotocol.io/docs/concepts/resources)
 
 The `MCP::Resource` class provides a way to register resources with the server.
 
 ```ruby
 resource = MCP::Resource.new(
   uri: "https://example.com/my_resource",
-  name: "my-resource",
-  title: "My Resource", # WARNING: This is a `Draft` and is not supported in the `Version 2025-06-18 (latest)` specification.
+  name: "My Resource",
   description: "Lorem ipsum dolor sit amet",
   mime_type: "text/html",
 )
@@ -586,31 +710,13 @@ server.resources_read_handler do |params|
   [{
     uri: params[:uri],
     mimeType: "text/plain",
-    text: "Hello from example resource! URI: #{params[:uri]}"
+    text: params[:uri],
   }]
 end
+
 ```
 
 otherwise `resources/read` requests will be a no-op.
-
-### Resource Templates
-
-The `MCP::ResourceTemplate` class provides a way to register resource templates with the server.
-
-```ruby
-resource_template = MCP::ResourceTemplate.new(
-  uri_template: "https://example.com/my_resource_template",
-  name: "my-resource-template",
-  title: "My Resource Template", # WARNING: This is a `Draft` and is not supported in the `Version 2025-06-18 (latest)` specification.
-  description: "Lorem ipsum dolor sit amet",
-  mime_type: "text/html",
-)
-
-server = MCP::Server.new(
-  name: "my_server",
-  resource_templates: [resource_template],
-)
-```
 
 ## Releases
 

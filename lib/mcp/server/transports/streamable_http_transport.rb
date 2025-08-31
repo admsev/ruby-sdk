@@ -34,13 +34,7 @@ module MCP
           end
         end
 
-        def send_notification(method, params = nil, session_id: nil)
-          notification = {
-            jsonrpc: "2.0",
-            method:,
-          }
-          notification[:params] = params if params
-
+        def send_notification(notification, session_id: nil)
           @mutex.synchronize do
             if session_id
               # Send to specific session
@@ -108,8 +102,6 @@ module MCP
 
           if body["method"] == "initialize"
             handle_initialization(body_string, body)
-          elsif body["method"] == MCP::Methods::NOTIFICATIONS_INITIALIZED
-            handle_notification_initialized
           else
             handle_regular_request(body_string, session_id)
           end
@@ -185,10 +177,6 @@ module MCP
           }
 
           [200, headers, [response]]
-        end
-
-        def handle_notification_initialized
-          [202, {}, []]
         end
 
         def handle_regular_request(body_string, session_id)

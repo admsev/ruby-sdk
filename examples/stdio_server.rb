@@ -25,7 +25,7 @@ class ExampleTool < MCP::Tool
   end
 end
 
-# Create a simple prompt
+# Create a simple prompt with enum arguments
 class ExamplePrompt < MCP::Prompt
   description "A simple example prompt that echoes back its arguments"
   arguments [
@@ -50,17 +50,61 @@ class ExamplePrompt < MCP::Prompt
   end
 end
 
+# Create a prompt with enum arguments
+class CodeReviewPrompt < MCP::Prompt
+  description "A prompt for code review with language selection"
+  arguments [
+    MCP::Prompt::Argument.enum(
+      name: "language",
+      enum_values: ["python", "javascript", "ruby", "java"],
+      enum_names: ["Python", "JavaScript", "Ruby", "Java"],
+      description: "The programming language of the code to review",
+      required: true
+    ),
+    MCP::Prompt::Argument.string(
+      name: "code",
+      description: "The code to review",
+      required: true,
+      max_length: 5000
+    ),
+    MCP::Prompt::Argument.enum(
+      name: "review_type",
+      enum_values: ["security", "performance", "style", "comprehensive"],
+      description: "Type of review to perform",
+      required: false
+    )
+  ]
+
+  class << self
+    def template(args, server_context:)
+      language = args[:language]
+      code = args[:code]
+      review_type = args[:review_type] || "comprehensive"
+
+      prompt_text = "Please review this #{language} code with a focus on #{review_type} aspects.\n\nCode to review:\n#{code}"
+
+      MCP::Prompt::Result.new(
+        messages: [
+          MCP::Prompt::Message.new(
+            role: "user",
+            content: MCP::Content::Text.new(prompt_text),
+          ),
+        ],
+      )
+    end
+  end
+end
+
 # Set up the server
 server = MCP::Server.new(
   name: "example_server",
   version: "1.0.0",
   tools: [ExampleTool],
-  prompts: [ExamplePrompt],
+  prompts: [ExamplePrompt, CodeReviewPrompt],
   resources: [
     MCP::Resource.new(
-      uri: "https://test_resource.invalid",
-      name: "test-resource",
-      title: "Test Resource",
+      uri: "test_resource",
+      name: "Test resource",
       description: "Test resource that echoes back the uri as its content",
       mime_type: "text/plain",
     ),
@@ -86,7 +130,7 @@ server.resources_read_handler do |params|
   [{
     uri: params[:uri],
     mimeType: "text/plain",
-    text: "Hello, world! URI: #{params[:uri]}",
+    text: "Hello, world!",
   }]
 end
 

@@ -3,26 +3,15 @@
 module MCP
   class Tool
     class Response
-      NOT_GIVEN = Object.new.freeze
+      attr_reader :content, :is_error
 
-      attr_reader :content
-
-      def initialize(content, deprecated_error = NOT_GIVEN, error: false)
-        if deprecated_error != NOT_GIVEN
-          warn("Passing `error` with the 2nd argument of `Response.new` is deprecated. Use keyword argument like `Response.new(content, error: error)` instead.", uplevel: 1)
-          error = deprecated_error
-        end
-
+      def initialize(content, is_error = false)
         @content = content
-        @error = error
-      end
-
-      def error?
-        !!@error
+        @is_error = is_error
       end
 
       def to_h
-        { content:, isError: error? }.compact
+        { content:, isError: is_error }.compact
       end
     end
   end

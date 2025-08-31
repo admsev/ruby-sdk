@@ -31,13 +31,11 @@ module MCP
 
     include Instrumentation
 
-    attr_accessor :name, :title, :version, :instructions, :tools, :prompts, :resources, :server_context, :configuration, :capabilities, :transport
+    attr_accessor :name, :version, :tools, :prompts, :resources, :server_context, :configuration, :capabilities, :transport
 
     def initialize(
       name: "model_context_protocol",
-      title: nil,
       version: DEFAULT_VERSION,
-      instructions: nil,
       tools: [],
       prompts: [],
       resources: [],
@@ -48,9 +46,7 @@ module MCP
       transport: nil
     )
       @name = name
-      @title = title
       @version = version
-      @instructions = instructions
       @tools = tools.to_h { |t| [t.name_value, t] }
       @prompts = prompts.to_h { |p| [p.name_value, p] }
       @resources = resources
@@ -58,12 +54,6 @@ module MCP
       @resource_index = index_resources_by_uri(resources)
       @server_context = server_context
       @configuration = MCP.configuration.merge(configuration)
-
-      if @configuration.protocol_version == "2024-11-05" && @instructions
-        message = "`instructions` supported by protocol version 2025-03-26 or higher"
-        raise ArgumentError, message
-      end
-
       @capabilities = capabilities || default_capabilities
 
       @handlers = {
@@ -76,7 +66,6 @@ module MCP
         Methods::PROMPTS_GET => method(:get_prompt),
         Methods::INITIALIZE => method(:init),
         Methods::PING => ->(_) { {} },
-        Methods::NOTIFICATIONS_INITIALIZED => ->(_) {},
 
         # No op handlers for currently unsupported methods
         Methods::RESOURCES_SUBSCRIBE => ->(_) {},
@@ -99,13 +88,13 @@ module MCP
       end
     end
 
-    def define_tool(name: nil, title: nil, description: nil, input_schema: nil, annotations: nil, &block)
-      tool = Tool.define(name:, title:, description:, input_schema:, annotations:, &block)
+    def define_tool(name: nil, description: nil, input_schema: nil, annotations: nil, &block)
+      tool = Tool.define(name:, description:, input_schema:, annotations:, &block)
       @tools[tool.name_value] = tool
     end
 
-    def define_prompt(name: nil, title: nil, description: nil, arguments: [], &block)
-      prompt = Prompt.define(name:, title:, description:, arguments:, &block)
+    def define_prompt(name: nil, description: nil, arguments: [], &block)
+      prompt = Prompt.define(name:, description:, arguments:, &block)
       @prompts[prompt.name_value] = prompt
     end
 
@@ -220,7 +209,6 @@ module MCP
     def server_info
       @server_info ||= {
         name:,
-        title:,
         version:,
       }
     end
@@ -230,8 +218,7 @@ module MCP
         protocolVersion: configuration.protocol_version,
         capabilities: capabilities,
         serverInfo: server_info,
-        instructions: instructions,
-      }.compact
+      }
     end
 
     def list_tools(request)
@@ -246,7 +233,7 @@ module MCP
         raise RequestHandlerError.new("Tool not found #{tool_name}", request, error_type: :tool_not_found)
       end
 
-      arguments = request[:arguments] || {}
+      arguments = request[:arguments]
       add_instrumentation_data(tool_name:)
 
       if tool.input_schema&.missing_required_arguments?(arguments)
@@ -327,7 +314,7 @@ module MCP
     end
 
     def call_tool_with_args(tool, arguments)
-      args = arguments&.transform_keys(&:to_sym) || {}
+      args = arguments.transform_keys(&:to_sym)
 
       if accepts_server_context?(tool.method(:call))
         tool.call(**args, server_context: server_context).to_h

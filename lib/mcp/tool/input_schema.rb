@@ -15,13 +15,8 @@ module MCP
         validate_schema!
       end
 
-      def ==(other)
-        other.is_a?(InputSchema) && properties == other.properties && required == other.required
-      end
-
       def to_h
-        { type: "object" }.tap do |hsh|
-          hsh[:properties] = properties if properties.any?
+        { type: "object", properties: }.tap do |hsh|
           hsh[:required] = required if required.any?
         end
       end

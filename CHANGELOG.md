@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Enum argument support for prompts with JSON Schema validation
+- Enhanced Prompt::Argument class with convenience methods for different argument types
+- Argument validation against schemas in prompt execution
+- Support for string, number, integer, boolean, and enum argument types
+- Integration with MCP completion API for enum value suggestions
+
 ## [0.2.0] - 2025-07-15
 
 ### Added
